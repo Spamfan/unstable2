@@ -2,308 +2,586 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Framework 6: Audio & UI Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>manage edlps (sandbox v4)</title>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #333; touch-action: none; font-family: Arial, sans-serif; }
-        canvas { display: block; width: 100%; height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #e4e6eb; /* Darker background for contrast */
+            margin: 0;
+            padding: 20px;
+            color: #050505;
+            font-size: 13px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        #container {
+            width: fit-content; /* Shrink wrap width */
+            margin: 0 auto; /* Center alignment */
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        /* --- FILTERS BAR --- */
+        #filter-bar {
+            display: flex;
+            gap: 20px;
+            padding: 10px;
+            background: #f0f2f5;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         
-        #debug-overlay {
-            position: fixed; top: 10px; left: 10px;
-            color: #00FF00; font-family: monospace; font-size: 16px; font-weight: bold;
-            background: rgba(0,0,0,0.6); padding: 8px; pointer-events: none; border-radius: 4px;
+        .filter-section {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            border-right: 1px solid #ccc;
+            padding-right: 15px;
         }
-        #fw-version {
-            position: fixed; top: 10px; right: 10px;
-            color: white; font-weight: bold; font-size: 18px;
-            text-shadow: 1px 1px 2px black; pointer-events: none;
+        .filter-section:last-child { border-right: none; }
+
+        .filter-master { font-weight: 800; font-size: 0.9em; margin-bottom: 3px; cursor: pointer; }
+        .filter-subs { display: flex; gap: 10px; }
+        .filter-label { font-size: 0.8em; color: #444; display: flex; align-items: center; cursor: pointer; }
+        .filter-label input { margin-right: 4px; }
+
+        /* Search & Actions */
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
         }
 
-        /* SIMULATED UI OVERLAY */
-        #game-ui {
-            position: fixed; top: 50px; right: 10px;
-            display: flex; gap: 15px;
-            background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;
-            pointer-events: none;
+        #search-bar {
+            flex-grow: 1;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #000;
+            border-radius: 4px;
         }
-        .ui-text { color: white; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 2px black; }
-        #money-display { color: #fbbf24; }
-        #health-display { color: #ef4444; }
 
-        #joystick-zone {
-            position: fixed; bottom: 50px; left: 50px;
-            width: 150px; height: 150px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            touch-action: none;
+        .btn-save-all {
+            background-color: #1877f2;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            display: none; /* Hidden until dirty */
+            white-space: nowrap;
         }
-        #joystick-knob {
-            position: absolute; top: 50%; left: 50%;
-            width: 50px; height: 50px;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
+        .btn-save-all.visible { display: block; }
+
+        /* Table Styles */
+        table {
+            border-collapse: collapse;
+            width: auto; /* Shrink wrap */
+        }
+
+        th {
+            background-color: #f0f2f5;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            color: #444;
+            border-bottom: 2px solid #000;
+            white-space: nowrap;
+        }
+        
+        td {
+            padding: 2px 4px;
+            border-bottom: 1px solid #ccc;
+            vertical-align: top;
+        }
+
+        /* Hiding Logic */
+        .hide-col { display: none !important; }
+
+        /* Input Fields - High Contrast */
+        input[type="text"], input[type="number"] {
+            width: 50px; /* Narrow default */
+            padding: 4px 2px;
+            border: 1px solid #000;
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #000;
+            background-color: #fff;
+            text-align: center;
+        }
+        input.input-name { width: 140px; text-align: left; font-weight: normal; }
+        
+        input:focus {
+            background-color: #fff;
+            border: 2px solid #1877f2;
+            outline: none;
+        }
+
+        /* --- ACCORDION ROW BEHAVIOR --- */
+        tr.data-row {
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        tr.data-row:hover { background-color: #f7f8fa; }
+        tr.data-row.active { 
+            background-color: #eef3fc; 
+            border-left: 3px solid #1877f2;
+        }
+
+        /* Hidden Elements (Show on Active) */
+        .row-meta, .row-actions, .name-lock-wrapper { display: none; }
+        
+        tr.active .row-meta { display: block; margin-top: 4px; }
+        tr.active .row-actions { display: flex; gap: 5px; justify-content: center; margin-top: 5px; }
+        tr.active .name-lock-wrapper { display: flex; align-items: center; font-size: 0.75em; color: #1877f2; margin-top: 2px; cursor: pointer; }
+
+        /* Timestamp Styling */
+        .ts-label {
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            display: block;
+        }
+        .ts-recent { color: #008000; font-weight: bold; }
+
+        /* Name Field Logic */
+        .name-display { font-weight: bold; padding: 5px 2px; }
+        .name-input-wrapper { display: none; }
+        .name-unlocked .name-display { display: none; }
+        .name-unlocked .name-input-wrapper { display: block; }
+
+        /* Group Headers */
+        .group-att { background-color: #e3f2fd; color: #000; border: 1px solid #999; }
+        .group-vzw { background-color: #ffebee; color: #000; border: 1px solid #999; }
+        .group-tmo { background-color: #fce4ec; color: #000; border: 1px solid #999; }
+
+        /* Icon Buttons */
+        .btn-icon {
+            background: none; border: none; cursor: pointer; font-size: 14px; padding: 5px;
+        }
+        .btn-save-row { color: #1877f2; }
+        .btn-del-row { color: #d93025; }
+
+        /* Add Row Styling */
+        #add-row { background-color: #fff; border-bottom: 2px solid #000; }
+        #add-row input { border: 1px dashed #666; }
+        
+        .sticky-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
         }
     </style>
 </head>
 <body>
 
-    <div id="fw-version">Framework 6</div>
-    <div id="debug-overlay">
-        FPS: <span id="fps-cur">0</span><br>
-        Min: <span id="fps-min" style="color: #ff4444;">0</span><br>
-        Max: <span id="fps-max" style="color: #44ff44;">0</span><br>
-        Test: Audio + UI Updates
+    <h1>manage edlps (sandbox v4)</h1>
+
+    <div id="container">
+        
+        <!-- Filter Bar -->
+        <div id="filter-bar">
+            <!-- ATT Group -->
+            <div class="filter-section">
+                <label class="filter-master"><input type="checkbox" id="m-att" checked> AT&T</label>
+                <div class="filter-subs">
+                    <label class="filter-label"><input type="checkbox" id="cb-att-mo" data-group="att" checked> Mo</label>
+                    <label class="filter-label"><input type="checkbox" id="cb-att-tot" data-group="att" checked> Total</label>
+                </div>
+            </div>
+            <!-- VZW Group -->
+            <div class="filter-section">
+                <label class="filter-master"><input type="checkbox" id="m-vzw" checked> Verizon</label>
+                <div class="filter-subs">
+                    <label class="filter-label"><input type="checkbox" id="cb-vzw-mo" data-group="vzw" checked> Mo</label>
+                    <label class="filter-label"><input type="checkbox" id="cb-vzw-tot" data-group="vzw" checked> Total</label>
+                </div>
+            </div>
+            <!-- TMO Group -->
+            <div class="filter-section">
+                <label class="filter-master"><input type="checkbox" id="m-tmo" checked> T-Mobile</label>
+                <div class="filter-subs">
+                    <label class="filter-label"><input type="checkbox" id="cb-tmo-dp" data-group="tmo" checked> DP</label>
+                    <label class="filter-label"><input type="checkbox" id="cb-tmo-mo" data-group="tmo" checked> Mo</label>
+                    <label class="filter-label"><input type="checkbox" id="cb-tmo-tot" data-group="tmo" checked> Total</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Controls -->
+        <div class="controls-row">
+            <input type="text" id="search-bar" placeholder="Search devices...">
+            <button class="btn-save-all" id="btn-save-top">Save All Changes</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table id="main-table">
+                <thead>
+                    <tr>
+                        <th class="col-name">Device</th>
+                        
+                        <!-- ATT Headers -->
+                        <th class="group-att c-att-mo">$/mo</th>
+                        <th class="group-att c-att-tot">Total</th>
+                        
+                        <!-- VZW Headers -->
+                        <th class="group-vzw c-vzw-mo">$/mo</th>
+                        <th class="group-vzw c-vzw-tot">Total</th>
+                        
+                        <!-- TMO Headers -->
+                        <th class="group-tmo c-tmo-dp">Down</th>
+                        <th class="group-tmo c-tmo-mo">Mo<br><span style="font-size:0.7em; font-weight:normal;">(after dp)</span></th>
+                        <th class="group-tmo c-tmo-tot">Total</th>
+                        
+                        <th class="col-actions" style="width: 40px;"></th>
+                    </tr>
+                    
+                    <!-- Add New Row -->
+                    <tr id="add-row">
+                        <td><input type="text" id="new-name" class="input-name" placeholder="New Device Name"></td>
+                        
+                        <td class="c-att-mo"><input type="number" id="new-att-mo" step="0.01"></td>
+                        <td class="c-att-tot"><input type="number" id="new-att-total"></td>
+                        
+                        <td class="c-vzw-mo"><input type="number" id="new-vzw-mo" step="0.01"></td>
+                        <td class="c-vzw-tot"><input type="number" id="new-vzw-total"></td>
+                        
+                        <td class="c-tmo-dp"><input type="number" id="new-tmo-dp"></td>
+                        <td class="c-tmo-mo"><input type="number" id="new-tmo-mo" step="0.01"></td>
+                        <td class="c-tmo-tot"><input type="number" id="new-tmo-total"></td>
+                        
+                        <td style="text-align:center;"><button id="btn-add-device" class="btn-icon" style="color:green;"><i class="fas fa-plus"></i></button></td>
+                    </tr>
+                </thead>
+                <tbody id="device-list">
+                    <!-- Data Rows -->
+                </tbody>
+            </table>
+            <div id="loading-msg" style="text-align:center; padding:20px; color:#666;">Connecting...</div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="sticky-footer">
+            <button class="btn-save-all" id="btn-save-bottom">Save All Changes</button>
+        </div>
     </div>
 
-    <div id="game-ui">
-        <div id="money-display" class="ui-text">$0</div>
-        <div id="health-display" class="ui-text">5/5 HP</div>
-    </div>
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    <canvas id="gameCanvas"></canvas>
-    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+        // --- CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDHVW6d6n-lS43mf9DIsSYJjzBWvk4B1R4",
+            authDomain: "optimizer-data.firebaseapp.com",
+            databaseURL: "https://optimizer-data-default-rtdb.firebaseio.com",
+            projectId: "optimizer-data",
+            storageBucket: "optimizer-data.firebasestorage.app",
+            messagingSenderId: "162386405726",
+            appId: "1:162386405726:web:a5f22c3810152949b947cf"
+        };
 
-<script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    // State
-    let width, height;
-    const gridSize = 40;
-    const worldSize = 4000;
-    let camera = { x: 0, y: 0 };
-    let player = { x: 2000, y: 2000, width: 35, height: 35, speed: 8, angle: 0, turretAngle: 0 };
-    let joystick = { active: false, dx: 0, dy: 0 };
-    let frameCounter = 0; // For UI updates
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-    // --- AUDIO ENGINE ---
-    let audioCtx;
-    let osc;
-    let gainNode;
-    let isAudioActive = false;
+        // --- STATE ---
+        let devicesData = {};
+        let dirtyRows = new Set(); // Tracks keys of modified rows
 
-    function initAudio() {
-        if(audioCtx) return;
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        
-        osc = audioCtx.createOscillator();
-        gainNode = audioCtx.createGain();
-        
-        osc.type = 'sawtooth';
-        osc.frequency.value = 100; // Low rumble
-        gainNode.gain.value = 0.1;
-        
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        osc.start();
-        isAudioActive = true;
-    }
+        // --- DOM ---
+        const deviceListEl = document.getElementById('device-list');
+        const searchBar = document.getElementById('search-bar');
+        const btnSaveTop = document.getElementById('btn-save-top');
+        const btnSaveBottom = document.getElementById('btn-save-bottom');
 
-    document.body.addEventListener('touchstart', () => {
-        if(!audioCtx) initAudio();
-        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    }, { once: true });
+        // --- FILTER LOGIC ---
+        const colMap = {
+            'cb-att-mo': 'c-att-mo', 'cb-att-tot': 'c-att-tot',
+            'cb-vzw-mo': 'c-vzw-mo', 'cb-vzw-tot': 'c-vzw-tot',
+            'cb-tmo-dp': 'c-tmo-dp', 'cb-tmo-mo': 'c-tmo-mo', 'cb-tmo-tot': 'c-tmo-tot'
+        };
 
-    // GENERATE 2000 "TANKS"
-    let worldObjects = [];
-    function generateWorld() {
-        for(let i=0; i<2000; i++) {
-            worldObjects.push({
-                x: Math.random() * worldSize,
-                y: Math.random() * worldSize,
-                angle: Math.random() * Math.PI * 2,
-                turretAngle: Math.random() * Math.PI * 2,
-                width: 35,
-                height: 35,
-                color: Math.random() > 0.5 ? '#991b1b' : '#7f1d1d'
+        // Master Toggles
+        ['att', 'vzw', 'tmo'].forEach(carrier => {
+            document.getElementById(`m-${carrier}`).addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                document.querySelectorAll(`input[data-group="${carrier}"]`).forEach(cb => {
+                    cb.checked = isChecked;
+                    toggleCol(colMap[cb.id], isChecked);
+                });
+            });
+        });
+
+        // Individual Toggles
+        Object.keys(colMap).forEach(id => {
+            document.getElementById(id).addEventListener('change', (e) => {
+                toggleCol(colMap[id], e.target.checked);
+            });
+        });
+
+        function toggleCol(className, isVisible) {
+            const cells = document.querySelectorAll('.' + className);
+            cells.forEach(c => c.classList.toggle('hide-col', !isVisible));
+        }
+
+        // --- MATH ---
+        const roundMo = (n) => Math.round((parseFloat(n)||0)*100)/100;
+        const roundTot = (n) => Math.round(parseFloat(n)||0);
+        const calc36_Tot = (m) => roundTot(m*36);
+        const calc36_Mo = (t) => roundMo(t/36);
+        const calcTmo_Mo = (t, d) => roundMo((t-d)/24);
+        const calcTmo_Tot = (m, d) => roundTot(d+(m*24));
+
+        // --- RENDER ---
+        function formatTimestamp(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            const now = new Date();
+            const diff = (now-d)/(1000*60*60);
+            const str = `${d.getMonth()+1}/${d.getDate()}`;
+            if (diff < 72) {
+                const h = d.getHours().toString().padStart(2,'0');
+                const m = d.getMinutes().toString().padStart(2,'0');
+                return `<span class="ts-recent">${str} ${h}:${m}</span>`;
+            }
+            return str;
+        }
+
+        const devicesRef = ref(db, 'devices');
+        onValue(devicesRef, (snapshot) => {
+            document.getElementById('loading-msg').style.display = 'none';
+            devicesData = snapshot.val() || {};
+            // Clear dirty state on reload from server
+            dirtyRows.clear();
+            updateSaveAllButtons();
+            renderTable();
+        });
+
+        function renderTable() {
+            deviceListEl.innerHTML = '';
+            const term = searchBar.value.toLowerCase();
+            const keys = Object.keys(devicesData).sort((a,b) => (devicesData[a].name||'').localeCompare(devicesData[b].name||''));
+
+            keys.forEach(key => {
+                const d = devicesData[key];
+                if (term && !d.name.toLowerCase().includes(term)) return;
+
+                const getTs = (c) => c?.last_updated || d.last_updated;
+                const row = document.createElement('tr');
+                row.className = 'data-row';
+                row.dataset.key = key;
+                row.dataset.original = JSON.stringify(d); // Store clean state
+
+                row.innerHTML = `
+                    <td class="col-name">
+                        <div class="name-display">${d.name}</div>
+                        <div class="name-input-wrapper">
+                            <input type="text" class="input-name" value="${d.name}">
+                        </div>
+                        <div class="name-lock-wrapper"><i class="fas fa-lock"></i> &nbsp;Edit Title</div>
+                    </td>
+                    
+                    <td class="c-att-mo"><input type="number" class="i-att-mo" value="${d.att?.monthly||''}" step="0.01"><div class="row-meta ts-label">${formatTimestamp(getTs(d.att))}</div></td>
+                    <td class="c-att-tot"><input type="number" class="i-att-tot" value="${d.att?.total||''}"><div class="row-meta"></div></td>
+                    
+                    <td class="c-vzw-mo"><input type="number" class="i-vzw-mo" value="${d.vzw?.monthly||''}" step="0.01"><div class="row-meta ts-label">${formatTimestamp(getTs(d.vzw))}</div></td>
+                    <td class="c-vzw-tot"><input type="number" class="i-vzw-tot" value="${d.vzw?.total||''}"><div class="row-meta"></div></td>
+                    
+                    <td class="c-tmo-dp"><input type="number" class="i-tmo-dp" value="${d.tmo?.dp||0}"><div class="row-meta"></div></td>
+                    <td class="c-tmo-mo"><input type="number" class="i-tmo-mo" value="${d.tmo?.monthly||''}" step="0.01"><div class="row-meta ts-label">${formatTimestamp(getTs(d.tmo))}</div></td>
+                    <td class="c-tmo-tot"><input type="number" class="i-tmo-tot" value="${d.tmo?.total||''}"><div class="row-meta"></div></td>
+                    
+                    <td class="col-actions">
+                        <div class="row-actions">
+                            <button class="btn-icon btn-save-row"><i class="fas fa-save"></i></button>
+                            <button class="btn-icon btn-del-row"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+
+                // Handle Active State
+                row.addEventListener('click', (e) => {
+                    // Don't toggle if clicking inside an input
+                    if (e.target.tagName === 'INPUT') return;
+                    
+                    // Close others
+                    document.querySelectorAll('tr.active').forEach(r => {
+                        if (r !== row) r.classList.remove('active');
+                    });
+                    row.classList.add('active');
+                });
+
+                // Name Lock Logic
+                const lockBtn = row.querySelector('.name-lock-wrapper');
+                lockBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    row.querySelector('.col-name').classList.add('name-unlocked');
+                });
+
+                attachRowListeners(row, key);
+                deviceListEl.appendChild(row);
+            });
+            
+            // Re-apply current filter visibility
+            Object.keys(colMap).forEach(id => {
+                toggleCol(colMap[id], document.getElementById(id).checked);
             });
         }
-    }
-    generateWorld();
 
-    // GENERATE 50 BULLETS
-    let bullets = [];
-    function spawnBullets() {
-        for(let i=0; i<50; i++) {
-            bullets.push({
-                x: Math.random() * worldSize,
-                y: Math.random() * worldSize,
-                dx: (Math.random() - 0.5) * 10,
-                dy: (Math.random() - 0.5) * 10
+        function attachRowListeners(row, key) {
+            const inputs = row.querySelectorAll('input');
+            const saveBtn = row.querySelector('.btn-save-row');
+            const delBtn = row.querySelector('.btn-del-row');
+
+            inputs.forEach(inp => {
+                inp.addEventListener('input', (e) => {
+                    dirtyRows.add(key); // Mark row as modified
+                    updateSaveAllButtons();
+                    
+                    // Auto Math
+                    const t = e.target;
+                    // ATT
+                    if (t.classList.contains('i-att-tot')) row.querySelector('.i-att-mo').value = t.value ? calc36_Mo(t.value) : '';
+                    if (t.classList.contains('i-att-mo')) row.querySelector('.i-att-tot').value = t.value ? calc36_Tot(t.value) : '';
+                    // VZW
+                    if (t.classList.contains('i-vzw-tot')) row.querySelector('.i-vzw-mo').value = t.value ? calc36_Mo(t.value) : '';
+                    if (t.classList.contains('i-vzw-mo')) row.querySelector('.i-vzw-tot').value = t.value ? calc36_Tot(t.value) : '';
+                    // TMO
+                    const dpIn = row.querySelector('.i-tmo-dp');
+                    const moIn = row.querySelector('.i-tmo-mo');
+                    const totIn = row.querySelector('.i-tmo-tot');
+                    const dp = parseFloat(dpIn.value)||0;
+                    if (t === totIn) moIn.value = t.value ? calcTmo_Mo(parseFloat(t.value), dp) : '';
+                    if (t === moIn) totIn.value = t.value ? calcTmo_Tot(parseFloat(t.value), dp) : '';
+                    if (t === dpIn) {
+                        if (totIn.value) moIn.value = calcTmo_Mo(parseFloat(totIn.value), dp);
+                        else if (moIn.value) totIn.value = calcTmo_Tot(parseFloat(moIn.value), dp);
+                    }
+                });
+            });
+
+            // Single Save
+            saveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                saveRow(row, key);
+            });
+
+            // Single Delete
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('Delete?')) remove(ref(db, 'devices/'+key));
             });
         }
-    }
-    spawnBullets();
 
-    function resize() {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        canvas.width = width;
-        canvas.height = height;
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    // SPATIAL GRID
-    class SpatialGrid {
-        constructor(width, height, cellSize) {
-            this.cellSize = cellSize;
-            this.cells = new Map();
-        }
-        getKey(x, y) { return `${x},${y}`; }
-        add(obj) {
-            const startX = Math.floor(obj.x / this.cellSize);
-            const startY = Math.floor(obj.y / this.cellSize);
-            const key = this.getKey(startX, startY);
-            if (!this.cells.has(key)) this.cells.set(key, []);
-            this.cells.get(key).push(obj);
-        }
-        getNearby(x, y) {
-            const nearby = [];
-            const cx = Math.floor(x / this.cellSize);
-            const cy = Math.floor(y / this.cellSize);
-            for(let i = cx-1; i<=cx+1; i++) {
-                for(let j = cy-1; j<=cy+1; j++) {
-                    const key = this.getKey(i, j);
-                    if(this.cells.has(key)) nearby.push(...this.cells.get(key));
+        function saveRow(row, key) {
+            const orig = JSON.parse(row.dataset.original);
+            const now = Date.now();
+            const curr = {
+                name: row.querySelector('.input-name').value,
+                att: { 
+                    monthly: parseFloat(row.querySelector('.i-att-mo').value)||0, 
+                    total: parseFloat(row.querySelector('.i-att-tot').value)||0,
+                    last_updated: orig.att?.last_updated || orig.last_updated
+                },
+                vzw: { 
+                    monthly: parseFloat(row.querySelector('.i-vzw-mo').value)||0, 
+                    total: parseFloat(row.querySelector('.i-vzw-tot').value)||0,
+                    last_updated: orig.vzw?.last_updated || orig.last_updated
+                },
+                tmo: { 
+                    dp: parseFloat(row.querySelector('.i-tmo-dp').value)||0, 
+                    monthly: parseFloat(row.querySelector('.i-tmo-mo').value)||0, 
+                    total: parseFloat(row.querySelector('.i-tmo-tot').value)||0,
+                    last_updated: orig.tmo?.last_updated || original.last_updated
                 }
-            }
-            return nearby;
-        }
-    }
+            };
 
-    // Joystick Logic
-    const joyZone = document.getElementById('joystick-zone');
-    const joyKnob = document.getElementById('joystick-knob');
-    const joyRect = joyZone.getBoundingClientRect();
-    const joyCenter = { x: joyRect.left + joyRect.width/2, y: joyRect.top + joyRect.height/2 };
+            // Timestamp logic
+            if (curr.att.total !== orig.att?.total) curr.att.last_updated = now;
+            if (curr.vzw.total !== orig.vzw?.total) curr.vzw.last_updated = now;
+            if (curr.tmo.total !== orig.tmo?.total || curr.tmo.dp !== orig.tmo?.dp) curr.tmo.last_updated = now;
 
-    joyZone.addEventListener('touchstart', (e) => { e.preventDefault(); joystick.active = true; updateJoystick(e.changedTouches[0]); }, { passive: false });
-    joyZone.addEventListener('touchmove', (e) => { e.preventDefault(); if(joystick.active) updateJoystick(e.changedTouches[0]); }, { passive: false });
-    const endJoystick = (e) => { e.preventDefault(); joystick.active = false; joystick.dx = 0; joystick.dy = 0; joyKnob.style.transform = `translate(-50%, -50%)`; };
-    joyZone.addEventListener('touchend', endJoystick); joyZone.addEventListener('touchcancel', endJoystick);
-
-    function updateJoystick(touch) {
-        const maxDist = 50;
-        let dx = touch.clientX - joyCenter.x;
-        let dy = touch.clientY - joyCenter.y;
-        const dist = Math.hypot(dx, dy);
-        const visualDist = Math.min(dist, maxDist);
-        const angle = Math.atan2(dy, dx);
-        joyKnob.style.transform = `translate(calc(-50% + ${Math.cos(angle)*visualDist}px), calc(-50% + ${Math.sin(angle)*visualDist}px))`;
-        if (dist > 10) { joystick.dx = dx / dist; joystick.dy = dy / dist; } else { joystick.dx = 0; joystick.dy = 0; }
-    }
-
-    function drawTank(t) {
-        ctx.save();
-        ctx.translate(t.x + t.width / 2, t.y + t.height / 2);
-        ctx.save();
-        ctx.rotate(t.angle);
-        ctx.lineWidth = 3; ctx.strokeStyle = 'black'; ctx.fillStyle = "#4A5568";
-        ctx.strokeRect(-t.width / 2, -t.height / 2, t.width, t.height);
-        ctx.fillRect(-t.width / 2, -t.height / 2, t.width, t.height);
-        ctx.fillStyle = t.color || "#3b82f6"; 
-        ctx.strokeRect(-t.width / 2 * 0.8, -t.height / 2 * 0.8, t.width * 0.8, t.height * 0.8);
-        ctx.fillRect(-t.width / 2 * 0.8, -t.height / 2 * 0.8, t.width * 0.8, t.height * 0.8);
-        ctx.restore();
-        ctx.rotate(t.turretAngle);
-        ctx.fillStyle = "#718096";
-        ctx.strokeRect(-t.width/4, -t.height/8, t.width/2, t.height/4);
-        ctx.fillRect(-t.width/4, -t.height/8, t.width/2, t.height/4);
-        ctx.restore();
-    }
-
-    // --- LOOP ---
-    let lastTime = performance.now();
-    let frames = 0;
-    let lastFpsTime = lastTime;
-    let minFps = 60;
-    let maxFps = 0;
-
-    function loop(now) {
-        frames++;
-        const delta = now - lastTime;
-        lastTime = now;
-
-        if (1000/delta < minFps && frames > 5) minFps = 1000/delta;
-        if (1000/delta > maxFps) maxFps = 1000/delta;
-
-        if (now - lastFpsTime >= 1000) {
-            document.getElementById('fps-cur').textContent = Math.round(frames);
-            document.getElementById('fps-min').textContent = Math.round(minFps);
-            document.getElementById('fps-max').textContent = Math.round(maxFps);
-            frames = 0; minFps = 60; maxFps = 0; lastFpsTime = now;
+            return update(ref(db, 'devices/'+key), curr);
         }
 
-        // --- AUDIO PITCH MODULATION ---
-        if (isAudioActive && osc) {
-            // Simulate pitch changing with speed
-            const pitch = 100 + (Math.abs(joystick.dx)*50);
-            osc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+        // --- BULK SAVE ---
+        function updateSaveAllButtons() {
+            const hasDirty = dirtyRows.size > 0;
+            btnSaveTop.classList.toggle('visible', hasDirty);
+            btnSaveBottom.classList.toggle('visible', hasDirty);
+            btnSaveTop.textContent = `Save ${dirtyRows.size} Changes`;
+            btnSaveBottom.textContent = `Save ${dirtyRows.size} Changes`;
         }
 
-        // --- DOM THRASHING (Simulated) ---
-        frameCounter++;
-        document.getElementById('money-display').textContent = `$${frameCounter}`;
-        
-        // --- LOGIC ---
-        let trashGrid = new SpatialGrid(worldSize, worldSize, 200);
-        for(const obj of worldObjects) trashGrid.add(obj);
+        const handleBulkSave = () => {
+            const updates = {};
+            dirtyRows.forEach(key => {
+                // Find row in DOM to get current values
+                const row = document.querySelector(`tr[data-key="${key}"]`);
+                if (row) {
+                    saveRow(row, key);
+                }
+            });
+            dirtyRows.clear();
+            updateSaveAllButtons();
+        };
 
-        for (let b of bullets) {
-            b.x += b.dx; b.y += b.dy;
-            if(b.x < 0 || b.x > worldSize) b.dx *= -1;
-            if(b.y < 0 || b.y > worldSize) b.dy *= -1;
-            const nearby = trashGrid.getNearby(b.x, b.y);
-            for(const t of nearby) {
-                const dist = Math.hypot(b.x - (t.x + t.width/2), b.y - (t.y + t.height/2));
-            }
-        }
+        btnSaveTop.addEventListener('click', handleBulkSave);
+        btnSaveBottom.addEventListener('click', handleBulkSave);
 
-        if (joystick.active) {
-            player.x += joystick.dx * player.speed;
-            player.y += joystick.dy * player.speed;
-            player.angle = Math.atan2(joystick.dy, joystick.dx);
-            player.turretAngle = player.angle; 
-        }
-        camera.x = player.x - width / 2;
-        camera.y = player.y - height / 2;
+        // --- ADD NEW ---
+        const addRow = document.getElementById('add-row');
+        addRow.addEventListener('input', (e) => {
+             const t = e.target;
+             if (t.id === 'new-att-total') document.getElementById('new-att-mo').value = calc36_Mo(t.value);
+             if (t.id === 'new-att-mo') document.getElementById('new-att-total').value = calc36_Tot(t.value);
+             if (t.id === 'new-vzw-total') document.getElementById('new-vzw-mo').value = calc36_Mo(t.value);
+             if (t.id === 'new-vzw-mo') document.getElementById('new-vzw-total').value = calc36_Tot(t.value);
+             const dp = parseFloat(document.getElementById('new-tmo-dp').value)||0;
+             if (t.id === 'new-tmo-total') document.getElementById('new-tmo-mo').value = calcTmo_Mo(t.value, dp);
+             if (t.id === 'new-tmo-mo') document.getElementById('new-tmo-total').value = calcTmo_Tot(t.value, dp);
+        });
 
-        ctx.clearRect(0, 0, width, height);
-        ctx.save();
-        ctx.translate(-camera.x, -camera.y);
+        document.getElementById('btn-add-device').addEventListener('click', () => {
+            const name = document.getElementById('new-name').value;
+            if (!name) return alert("Required");
+            const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const now = Date.now();
+            set(ref(db, 'devices/'+key), {
+                name: name,
+                att: { monthly: parseFloat(document.getElementById('new-att-mo').value)||0, total: parseFloat(document.getElementById('new-att-total').value)||0, last_updated: now },
+                vzw: { monthly: parseFloat(document.getElementById('new-vzw-mo').value)||0, total: parseFloat(document.getElementById('new-vzw-total').value)||0, last_updated: now },
+                tmo: { dp: parseFloat(document.getElementById('new-tmo-dp').value)||0, monthly: parseFloat(document.getElementById('new-tmo-mo').value)||0, total: parseFloat(document.getElementById('new-tmo-total').value)||0, last_updated: now },
+                last_updated: now
+            }).then(() => addRow.querySelectorAll('input').forEach(i => i.value = ''));
+        });
 
-        const startCol = Math.floor(camera.x / gridSize);
-        const endCol = startCol + (width / gridSize) + 1;
-        const startRow = Math.floor(camera.y / gridSize);
-        const endRow = startRow + (height / gridSize) + 1;
-        for (let c = startCol; c <= endCol; c++) {
-            for (let r = startRow; r <= endRow; r++) {
-                ctx.fillStyle = (c + r) % 2 === 0 ? '#48D43B' : '#3eb532';
-                ctx.fillRect(c * gridSize, r * gridSize, gridSize, gridSize);
-            }
-        }
+        searchBar.addEventListener('input', renderTable);
 
-        for (const obj of worldObjects) drawTank(obj);
-        drawTank(player);
-        
-        ctx.fillStyle = 'yellow';
-        for(const b of bullets) {
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        ctx.restore();
-        requestAnimationFrame(loop);
-    }
-
-    requestAnimationFrame(loop);
-
-</script>
+    </script>
 </body>
 </html>
