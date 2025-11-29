@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>manage edlps (sandbox v4)</title>
+    <title>manage edlps (sandbox v5)</title>
     
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,7 +11,7 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #e4e6eb; /* Darker background for contrast */
+            background-color: #e4e6eb;
             margin: 0;
             padding: 20px;
             color: #050505;
@@ -26,8 +26,8 @@
         }
 
         #container {
-            width: fit-content; /* Shrink wrap width */
-            margin: 0 auto; /* Center alignment */
+            width: fit-content;
+            margin: 0 auto;
             background: white;
             padding: 15px;
             border-radius: 8px;
@@ -87,7 +87,7 @@
             border: none;
             font-weight: bold;
             cursor: pointer;
-            display: none; /* Hidden until dirty */
+            display: none;
             white-space: nowrap;
         }
         .btn-save-all.visible { display: block; }
@@ -95,7 +95,7 @@
         /* Table Styles */
         table {
             border-collapse: collapse;
-            width: auto; /* Shrink wrap */
+            width: auto;
         }
 
         th {
@@ -118,9 +118,9 @@
         /* Hiding Logic */
         .hide-col { display: none !important; }
 
-        /* Input Fields - High Contrast */
+        /* Input Fields */
         input[type="text"], input[type="number"] {
-            width: 50px; /* Narrow default */
+            width: 50px;
             padding: 4px 2px;
             border: 1px solid #000;
             border-radius: 0;
@@ -149,7 +149,7 @@
             border-left: 3px solid #1877f2;
         }
 
-        /* Hidden Elements (Show on Active) */
+        /* Hidden Elements (FIXED IN V5) */
         .row-meta, .row-actions, .name-lock-wrapper { display: none; }
         
         tr.active .row-meta { display: block; margin-top: 4px; }
@@ -161,7 +161,7 @@
             font-size: 10px;
             color: #666;
             text-align: center;
-            display: block;
+            /* Removed display: block to let parent control visibility */
         }
         .ts-recent { color: #008000; font-weight: bold; }
 
@@ -198,7 +198,7 @@
 </head>
 <body>
 
-    <h1>manage edlps (sandbox v4)</h1>
+    <h1>manage edlps (sandbox v5)</h1>
 
     <div id="container">
         
@@ -310,7 +310,7 @@
 
         // --- STATE ---
         let devicesData = {};
-        let dirtyRows = new Set(); // Tracks keys of modified rows
+        let dirtyRows = new Set(); 
 
         // --- DOM ---
         const deviceListEl = document.getElementById('device-list');
@@ -375,7 +375,6 @@
         onValue(devicesRef, (snapshot) => {
             document.getElementById('loading-msg').style.display = 'none';
             devicesData = snapshot.val() || {};
-            // Clear dirty state on reload from server
             dirtyRows.clear();
             updateSaveAllButtons();
             renderTable();
@@ -394,7 +393,7 @@
                 const row = document.createElement('tr');
                 row.className = 'data-row';
                 row.dataset.key = key;
-                row.dataset.original = JSON.stringify(d); // Store clean state
+                row.dataset.original = JSON.stringify(d);
 
                 row.innerHTML = `
                     <td class="col-name">
@@ -425,10 +424,7 @@
 
                 // Handle Active State
                 row.addEventListener('click', (e) => {
-                    // Don't toggle if clicking inside an input
                     if (e.target.tagName === 'INPUT') return;
-                    
-                    // Close others
                     document.querySelectorAll('tr.active').forEach(r => {
                         if (r !== row) r.classList.remove('active');
                     });
@@ -446,7 +442,6 @@
                 deviceListEl.appendChild(row);
             });
             
-            // Re-apply current filter visibility
             Object.keys(colMap).forEach(id => {
                 toggleCol(colMap[id], document.getElementById(id).checked);
             });
@@ -459,10 +454,9 @@
 
             inputs.forEach(inp => {
                 inp.addEventListener('input', (e) => {
-                    dirtyRows.add(key); // Mark row as modified
+                    dirtyRows.add(key);
                     updateSaveAllButtons();
                     
-                    // Auto Math
                     const t = e.target;
                     // ATT
                     if (t.classList.contains('i-att-tot')) row.querySelector('.i-att-mo').value = t.value ? calc36_Mo(t.value) : '';
@@ -484,13 +478,11 @@
                 });
             });
 
-            // Single Save
             saveBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 saveRow(row, key);
             });
 
-            // Single Delete
             delBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (confirm('Delete?')) remove(ref(db, 'devices/'+key));
@@ -516,11 +508,10 @@
                     dp: parseFloat(row.querySelector('.i-tmo-dp').value)||0, 
                     monthly: parseFloat(row.querySelector('.i-tmo-mo').value)||0, 
                     total: parseFloat(row.querySelector('.i-tmo-tot').value)||0,
-                    last_updated: orig.tmo?.last_updated || original.last_updated
+                    last_updated: orig.tmo?.last_updated || orig.last_updated
                 }
             };
 
-            // Timestamp logic
             if (curr.att.total !== orig.att?.total) curr.att.last_updated = now;
             if (curr.vzw.total !== orig.vzw?.total) curr.vzw.last_updated = now;
             if (curr.tmo.total !== orig.tmo?.total || curr.tmo.dp !== orig.tmo?.dp) curr.tmo.last_updated = now;
@@ -528,7 +519,6 @@
             return update(ref(db, 'devices/'+key), curr);
         }
 
-        // --- BULK SAVE ---
         function updateSaveAllButtons() {
             const hasDirty = dirtyRows.size > 0;
             btnSaveTop.classList.toggle('visible', hasDirty);
@@ -538,13 +528,9 @@
         }
 
         const handleBulkSave = () => {
-            const updates = {};
             dirtyRows.forEach(key => {
-                // Find row in DOM to get current values
                 const row = document.querySelector(`tr[data-key="${key}"]`);
-                if (row) {
-                    saveRow(row, key);
-                }
+                if (row) saveRow(row, key);
             });
             dirtyRows.clear();
             updateSaveAllButtons();
@@ -553,8 +539,9 @@
         btnSaveTop.addEventListener('click', handleBulkSave);
         btnSaveBottom.addEventListener('click', handleBulkSave);
 
-        // --- ADD NEW ---
         const addRow = document.getElementById('add-row');
+        const addInputs = addRow.querySelectorAll('input');
+        
         addRow.addEventListener('input', (e) => {
              const t = e.target;
              if (t.id === 'new-att-total') document.getElementById('new-att-mo').value = calc36_Mo(t.value);
@@ -577,7 +564,7 @@
                 vzw: { monthly: parseFloat(document.getElementById('new-vzw-mo').value)||0, total: parseFloat(document.getElementById('new-vzw-total').value)||0, last_updated: now },
                 tmo: { dp: parseFloat(document.getElementById('new-tmo-dp').value)||0, monthly: parseFloat(document.getElementById('new-tmo-mo').value)||0, total: parseFloat(document.getElementById('new-tmo-total').value)||0, last_updated: now },
                 last_updated: now
-            }).then(() => addRow.querySelectorAll('input').forEach(i => i.value = ''));
+            }).then(() => addInputs.forEach(i => i.value = ''));
         });
 
         searchBar.addEventListener('input', renderTable);
