@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Framework 1: Baseline Test</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #333; touch-action: none; }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        #fps-display {
+            position: fixed; top: 10px; left: 10px;
+            color: #00FF00; font-family: monospace; font-size: 24px; font-weight: bold;
+            background: rgba(0,0,0,0.5); padding: 5px; pointer-events: none;
+        }
+
+        /* Joystick Styles */
+        #joystick-zone {
+            position: fixed; bottom: 50px; left: 50px;
+            width: 150px; height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            touch-action: none;
+        }
+        #joystick-knob {
+            position: absolute; top: 50%; left: 50%;
+            width: 50px; height: 50px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="fps-display">FPS: 0</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const fpsDisplay = document.getElementById('fps-display');
+
+    // State
+    let width, height;
+    const gridSize = 40;
+    let camera = { x: 0, y: 0 };
+    
+    let player = { 
+        x: 0, y: 0, 
+        width: 35, height: 35, 
+        speed: 5, 
+        angle: 0 
+    };
+
+    // Input
+    let joystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0 };
+
+    // Resize
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        // Center player initially
+        player.x = width / 2;
+        player.y = height / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Joystick Logic
+    const joyZone = document.getElementById('joystick-zone');
+    const joyKnob = document.getElementById('joystick-knob');
+    const joyRect = joyZone.getBoundingClientRect();
+    const joyCenter = { x: joyRect.left + joyRect.width/2, y: joyRect.top + joyRect.height/2 };
+
+    joyZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        joystick.active = true;
+        updateJoystick(e.changedTouches[0]);
+    }, { passive: false });
+
+    joyZone.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if(joystick.active) updateJoystick(e.changedTouches[0]);
+    }, { passive: false });
+
+    const endJoystick = (e) => {
+        e.preventDefault();
+        joystick.active = false;
+        joystick.dx = 0;
+        joystick.dy = 0;
+        joyKnob.style.transform = `translate(-50%, -50%)`;
+    };
+    joyZone.addEventListener('touchend', endJoystick);
+    joyZone.addEventListener('touchcancel', endJoystick);
+
+    function updateJoystick(touch) {
+        const maxDist = 50;
+        let dx = touch.clientX - joyCenter.x;
+        let dy = touch.clientY - joyCenter.y;
+        const dist = Math.hypot(dx, dy);
+        
+        // Clamp visual
+        const visualDist = Math.min(dist, maxDist);
+        const angle = Math.atan2(dy, dx);
+        const visualX = Math.cos(angle) * visualDist;
+        const visualY = Math.sin(angle) * visualDist;
+        
+        joyKnob.style.transform = `translate(calc(-50% + ${visualX}px), calc(-50% + ${visualY}px))`;
+
+        // Normalize Input (-1 to 1)
+        if (dist > 10) {
+            joystick.dx = dx / dist;
+            joystick.dy = dy / dist;
+        } else {
+            joystick.dx = 0;
+            joystick.dy = 0;
+        }
+    }
+
+    // Game Loop
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsTime = lastTime;
+
+    function loop(now) {
+        const deltaTime = now - lastTime;
+        lastTime = now;
+
+        // FPS Calculation
+        frameCount++;
+        if (now - lastFpsTime >= 1000) {
+            fpsDisplay.textContent = `FPS: ${frameCount}`;
+            frameCount = 0;
+            lastFpsTime = now;
+        }
+
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    function update() {
+        if (joystick.active) {
+            player.x += joystick.dx * player.speed;
+            player.y += joystick.dy * player.speed;
+            player.angle = Math.atan2(joystick.dy, joystick.dx);
+        }
+        
+        // Simple Camera Follow
+        camera.x = player.x - width / 2;
+        camera.y = player.y - height / 2;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+
+        // 1. Draw World Grid (The Stress Test)
+        // We draw enough tiles to fill the screen + buffer
+        const startCol = Math.floor(camera.x / gridSize);
+        const endCol = startCol + (width / gridSize) + 1;
+        const startRow = Math.floor(camera.y / gridSize);
+        const endRow = startRow + (height / gridSize) + 1;
+
+        ctx.fillStyle = '#48D43B'; // Grass Green
+        for (let c = startCol; c <= endCol; c++) {
+            for (let r = startRow; r <= endRow; r++) {
+                // Checkerboard pattern to prove we are drawing individual tiles
+                if ((c + r) % 2 === 0) {
+                    ctx.fillStyle = '#48D43B';
+                } else {
+                    ctx.fillStyle = '#3eb532'; // Slightly darker
+                }
+                ctx.fillRect(c * gridSize, r * gridSize, gridSize, gridSize);
+            }
+        }
+
+        // 2. Draw Player
+        ctx.translate(player.x + player.width/2, player.y + player.height/2);
+        ctx.rotate(player.angle);
+        ctx.fillStyle = '#3b82f6'; // Blue Tank
+        ctx.fillRect(-player.width/2, -player.height/2, player.width, player.height);
+        
+        // Turret line
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, -5, 30, 10);
+
+        ctx.restore();
+    }
+
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
